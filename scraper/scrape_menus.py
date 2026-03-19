@@ -1121,7 +1121,11 @@ def scrape_xo_groningen_lunch():
             dish_text = clean_text(dish_tag.get_text(strip=True))
             description = clean_text(desc_tag.get_text(strip=True)) if desc_tag else ""
             
-            price_match = re.search(r'€\s*\d+[,\.]?\d*', dish_text)
+            # FIX 1: Check if dish_text exists before regex
+            price_match = None
+            if dish_text:  
+                price_match = re.search(r'€\s*\d+[,\.]?\d*', dish_text)
+            
             if not price_match:
                 price_span = li.select_one("span.menu-list__item-price")
                 price = clean_text(price_span.get_text(strip=True)) if price_span else None
@@ -1129,8 +1133,12 @@ def scrape_xo_groningen_lunch():
                 price = price_match.group(0)
                 dish_text = dish_text.replace(price, "").strip()
             
+            # FIX 2: Safe string operations - use 'or ""' to handle None
+            safe_dish = dish_text or ""
+            safe_desc = description or ""
+            
             veg_keywords = ["Vega", "vegetarisch", "geitenkaas"]
-            tags = "Vegetarian" if any(k.lower() in dish_text.lower() or k.lower() in description.lower() for k in veg_keywords) else ""
+            tags = "Vegetarian" if any(k.lower() in safe_dish.lower() or k.lower() in safe_desc.lower() for k in veg_keywords) else ""
             
             if price:
                 all_items.append({
@@ -1138,15 +1146,17 @@ def scrape_xo_groningen_lunch():
                     "city": city_name,
                     "menu_type": menu_type,
                     "category": category,
-                    "dish": dish_text,
+                    "dish": safe_dish,
                     "price": price,
-                    "description": description,
+                    "description": safe_desc,
                     "tags": tags
                 })
 
     return pd.DataFrame(all_items).drop_duplicates(
         subset=["restaurant","city","menu_type","category","dish","price"]
     ).to_dict(orient="records")
+
+
 # =========================
 
 # =========================
