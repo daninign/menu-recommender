@@ -2,7 +2,6 @@ import pandas as pd
 
 from scraper.scrape_menus import scrape_all_menus
 
-
 def clean_text(text):
     if pd.isna(text) or text is None:
         return None
