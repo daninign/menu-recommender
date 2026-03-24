@@ -314,6 +314,10 @@ def clean_menu_data(df):
 
     df.loc[df["dish"].apply(is_drink), "category"] = "Drinks"
 
+    # Dropping all the drinks because they should not be in the file at all.
+    if "Drinks" in df["category"].values:
+        df.drop(df[df["category"] == "Drinks"].index, inplace=True)
+
     # auto tags
     df["tags"] = df.apply(
         lambda row: detect_tags(row["dish"], row["description"], row["tags"]),
