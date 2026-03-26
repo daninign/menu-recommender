@@ -1,3 +1,4 @@
+import re
 import pandas as pd
 
 from scraper.scrape_menus import scrape_all_menus
@@ -72,8 +73,6 @@ def clean_price(price):
     # clean up extra spaces
     price = " ".join(price.split()).strip()
 
-    import re
-    # search for the first number in the text
     match = re.search(r"\d+(\.\d+)?", price)
     if not match:
         return None
@@ -143,6 +142,13 @@ def standardize_category(category, menu_type):
         "burgers & buns": "Burgers",
         "burgers and buns": "Burgers",
         "lunchplank": "Lunch Specials",
+        "dranken": "Drinks",
+        "koude dranken": "Drinks",
+        "warme dranken": "Drinks",
+        "drinks": "Drinks",
+        "beverages": "Drinks",
+        "smoothies": "Drinks",
+        "smoothie": "Drinks",
     }
 
     # dinner categories and their standard names
@@ -178,6 +184,11 @@ def standardize_category(category, menu_type):
         "voor ieder wat wils - koude gerechten": "Starters",
         "voor ieder wat wils - warme gerechten": "Main",
         "voor ieder wat wils - desserts": "Dessert",
+        "dranken": "Drinks",
+        "koude dranken": "Drinks",
+        "warme dranken": "Drinks",
+        "drinks": "Drinks",
+        "beverages": "Drinks",
     }
 
     # lowercase category for easier matching
@@ -314,7 +325,39 @@ def clean_menu_data(df):
         axis=1
     )
 
-    # automatically detect tags from dish and description
+    # A fix to prevent drinks being misclassified under other categories (e.g. scraped under SALADS)
+    drink_keywords = {
+        "coffee", "koffie", "espresso", "cappuccino", "latte", "americano",
+        "macchiato", "mocha", "thee", "chai", "juice", "milkshake",
+        "tonic", "limonade", "lemonade", "frisdrank", "soda", "beer", "bier",
+        "wine", "wijn", "cocktail", "prosecco", "champagne", "chocomel", "drankje", "drink",
+        "rooibos", "kombucha", "infusion",
+        "fresh mint", "fresh ginger", "verse munt", "verse gember",
+        "ijsthee", "ice tea", "iced tea", "radler", "ranja",
+        "appelsap", "sinaasappelsap", "tomatensap", "karnemelk",
+        "warme chocolademelk", "sprite", "fanta", "pepsi", "7up", "rivella", "red bull", "energy drink",
+        "ginger beer", "bitter lemon", "tonic water", "cortado", "babyccino", "flat white",
+        "spa rood", "spa blauw", "spa water", "chamomile lavender", "pure green", "spicy lemon"
+    }
+
+    # Checks if the dish name contains any drink-related keyword as a whole word,
+    # and if so, sets the category to "Drinks". Uses word-boundary matching to
+    # avoid false positives like "cola" inside "chocolate" or "chocolade".
+    _drink_patterns = [re.compile(r'\b' + re.escape(kw) + r'\b') for kw in drink_keywords]
+
+    def is_drink(dish):
+        if not dish:
+            return False
+        dish_lower = dish.lower()
+        return any(p.search(dish_lower) for p in _drink_patterns)
+
+    df.loc[df["dish"].apply(is_drink), "category"] = "Drinks"
+
+    # Dropping all the drinks because they should not be in the file at all.
+    if "Drinks" in df["category"].values:
+        df.drop(df[df["category"] == "Drinks"].index, inplace=True)
+
+    # auto tags
     df["tags"] = df.apply(
         lambda row: detect_tags(row["dish"], row["description"], row["tags"]),
         axis=1
